@@ -2,14 +2,18 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
+import os
 
 st.set_page_config(page_title="📖 Novel Recommendation App", layout="wide")
 
 # ------------------ Load Data ------------------
 @st.cache_data
 def load_data():
-    return pd.read_csv('/mnt/data/novels.csv')  # gunakan path file yang diupload
+    path = 'novels.csv'  # pastikan file ada di lokasi yang sama dengan app.py
+    if not os.path.exists(path):
+        st.error(f"❌ File '{path}' tidak ditemukan. Harap pastikan file berada di direktori yang sama.")
+        st.stop()
+    return pd.read_csv(path)
 
 df = load_data()
 
@@ -66,25 +70,23 @@ elif page == "⭐ Rekomendasi Scored":
     st.title("⭐ Rekomendasi Novel Berdasarkan Scored")
     st.markdown("Masukkan skor dan sistem akan merekomendasikan novel dengan **scored serupa** menggunakan algoritma **Random Forest Regressor**.")
 
-    input_score = st.slider("🎯 Pilih Nilai Skor", min_value=float(df['scored'].min()),
+    input_score = st.slider("🎯 Pilih Nilai Skor", 
+                            min_value=float(df['scored'].min()),
                             max_value=float(df['scored'].max()), 
-                            value=float(df['scored'].mean()), step=0.01)
+                            value=float(df['scored'].mean()), 
+                            step=0.01)
 
-    # Pelatihan model
     X = df[['scored']]
     y = df['popularty']
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X, y)
 
-    # Evaluasi model
     r2_score = model.score(X, y)
     st.markdown(f"📈 <b>Model R² Score:</b> <code>{r2_score:.4f}</code>", unsafe_allow_html=True)
 
-    # Prediksi popularitas
     predicted_pop = model.predict([[input_score]])[0]
     st.markdown(f"📊 <b>Prediksi Popularitas untuk skor {input_score:.2f}:</b> <code>{predicted_pop:.2f}</code>", unsafe_allow_html=True)
 
-    # Tambahkan prediksi ke data
     df['predicted_popularty'] = model.predict(df[['scored']])
     df['predicted_diff'] = abs(df['predicted_popularty'] - predicted_pop)
     recommended = df.sort_values(by='predicted_diff').head(5)
@@ -102,7 +104,7 @@ elif page == "⭐ Rekomendasi Scored":
 elif page == "🎯 Rekomendasi Genre":
     st.title("🎯 Rekomendasi Novel Berdasarkan Genre dari Judul")
     st.markdown("Masukkan judul novel, dan sistem akan menampilkan rekomendasi novel dengan genre yang sama.")
-    
+
     title_input = st.text_input("✏️ Masukkan Judul Novel (case-sensitive)")
 
     if title_input:
@@ -114,20 +116,15 @@ elif page == "🎯 Rekomendasi Genre":
 
             st.markdown(f"### 📌 Genre: <span style='color:green'><code>{selected_genre}</code></span>", unsafe_allow_html=True)
 
-            # Train Random Forest on genre-specific subset
             X_genre = genre_novels[['scored']]
             y_genre = genre_novels['popularty']
             model_genre = RandomForestRegressor(n_estimators=100, random_state=42)
             model_genre.fit(X_genre, y_genre)
 
-            # Evaluasi model genre
             r2_genre = model_genre.score(X_genre, y_genre)
             st.markdown(f"📈 <b>Model R² Score (genre ini):</b> <code>{r2_genre:.4f}</code>", unsafe_allow_html=True)
 
-            # Prediksi popularitas semua novel dalam genre
             genre_novels['predicted_popularty'] = model_genre.predict(X_genre)
-
-            # Ambil 5 novel dengan prediksi popularitas tertinggi
             recommended = genre_novels.sort_values(by='predicted_popularty', ascending=False).head(5)
 
             st.markdown("### 📚 Rekomendasi Novel Berdasarkan Prediksi Popularitas:")
@@ -140,7 +137,6 @@ elif page == "🎯 Rekomendasi Genre":
             })
         else:
             st.warning("Judul tidak ditemukan dalam data.")
-
 
 # ------------------ Distribusi Genre dan Status ------------------
 elif page == "📊 Distribusi Novel":
